@@ -1,12 +1,8 @@
 import './SystemsTable.scss';
 
 import * as AppActions from '../../AppActions';
-import * as ReactRedux from 'react-redux';
-import * as pfReactTable from '@patternfly/react-table';
-import * as reactRouterDom from 'react-router-dom';
-
 import { DEBOUNCE_DELAY, SYSTEM_FILTER_CATEGORIES as SFC } from '../../AppConstants';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { connect, useStore } from 'react-redux';
 import { filterFetchBuilder, paramParser, pruneFilters, urlBuilder, workloadQueryBuilder } from '../Common/Tables';
 
@@ -20,13 +16,14 @@ import downloadReport from '../Common/DownloadHelper';
 import { getRegistry } from '@redhat-cloud-services/frontend-components-utilities/files/Registry';
 import { injectIntl } from 'react-intl';
 import messages from '../../Messages';
-import { reactCore } from '@redhat-cloud-services/frontend-components-utilities/files/inventoryDependencies';
 import routerParams from '@redhat-cloud-services/frontend-components-utilities/files/RouterParams';
 import { systemReducer } from '../../AppReducer';
+import { cellWidth, sortable, wrappable } from '@patternfly/react-table';
+
+const InventoryTable = React.lazy(() => import('insightsChrome/InventoryTable'));
 
 const SystemsTable = ({ systemsFetchStatus, fetchSystems, systems, intl, filters, setFilters, selectedTags, workloads, SID }) => {
     const inventory = useRef(null);
-    const [InventoryTable, setInventory] = useState();
     const store = useStore();
     const results = systems.meta ? systems.meta.count : 0;
     const [searchText, setSearchText] = useState(filters.display_name || '');
@@ -143,33 +140,24 @@ const SystemsTable = ({ systemsFetchStatus, fetchSystems, systems, intl, filters
     useEffect(() => {
         (async () => {
             const rows = [{
-                title: intl.formatMessage(messages.name), transforms: [pfReactTable.sortable, pfReactTable.cellWidth(80)], key: 'display_name'
+                title: intl.formatMessage(messages.name), transforms: [sortable, cellWidth(80)], key: 'display_name'
             },
-            { title: intl.formatMessage(messages.numberRuleHits), transforms: [pfReactTable.sortable, pfReactTable.wrappable], key: 'hits' },
-            { title: intl.formatMessage(messages.critical), transforms: [pfReactTable.sortable, pfReactTable.wrappable], key: 'critical_hits' },
-            { title: intl.formatMessage(messages.important), transforms: [pfReactTable.sortable, pfReactTable.wrappable], key: 'important_hits' },
-            { title: intl.formatMessage(messages.moderate), transforms: [pfReactTable.sortable, pfReactTable.wrappable], key: 'moderate_hits' },
-            { title: intl.formatMessage(messages.low), transforms: [pfReactTable.sortable, pfReactTable.wrappable], key: 'low_hits' },
-            { title: intl.formatMessage(messages.lastSeen), transforms: [pfReactTable.sortable, pfReactTable.wrappable], key: 'updated' }];
-            const { inventoryConnector, mergeWithEntities, INVENTORY_ACTION_TYPES
-            } = await insights.loadInventory({
-                ReactRedux,
-                react: React,
-                reactRouterDom,
-                pfReactTable,
-                pfReact: reactCore
-            });
-            getRegistry().register({
-                ...mergeWithEntities(
-                    systemReducer(
-                        [...rows],
-                        INVENTORY_ACTION_TYPES
-                    )
-                )
-            });
+            { title: intl.formatMessage(messages.numberRuleHits), transforms: [sortable, wrappable], key: 'hits' },
+            { title: intl.formatMessage(messages.critical), transforms: [sortable, wrappable], key: 'critical_hits' },
+            { title: intl.formatMessage(messages.important), transforms: [sortable, wrappable], key: 'important_hits' },
+            { title: intl.formatMessage(messages.moderate), transforms: [sortable, wrappable], key: 'moderate_hits' },
+            { title: intl.formatMessage(messages.low), transforms: [sortable, wrappable], key: 'low_hits' },
+            { title: intl.formatMessage(messages.lastSeen), transforms: [sortable, wrappable], key: 'updated' }];
 
-            const { InventoryTable } = inventoryConnector(store);
-            setInventory(() => InventoryTable);
+            console.log({ InventoryTable });
+            // getRegistry().register({
+            // ...mergeWithEntities(
+            // systemReducer(
+            // [...rows],
+            // INVENTORY_ACTION_TYPES
+            // )
+            // )
+            // });
         })();
     }, [intl, store]);
 
@@ -217,31 +205,33 @@ const SystemsTable = ({ systemsFetchStatus, fetchSystems, systems, intl, filters
 
     return InventoryTable ?
         systemsFetchStatus !== 'failed' ?
-            <InventoryTable
-                ref={inventory}
-                items={((systemsFetchStatus !== 'pending' && systems && systems.data) || []).map((system) => ({
-                    ...system,
-                    id: system.system_uuid
-                }))}
-                isFullView
-                sortBy={calculateSort()}
-                onSort={onSort}
-                hasCheckbox={false}
-                page={filters.offset / filters.limit + 1}
-                total={results}
-                isLoaded={systemsFetchStatus !== 'pending'}
-                perPage={Number(filters.limit)}
-                onRefresh={handleRefresh}
-                filterConfig={{ items: filterConfigItems }}
-                activeFiltersConfig={activeFiltersConfig}
-                exportConfig={{
-                    onSelect: (_e, fileType) => downloadReport('systems', fileType, urlBuilder(filters, selectedTags)),
-                    extraItems: [<li key='download-pd' role="menuitem">
-                        <SystemsPdf filters={{ ...filterFetchBuilder(filters) }} selectedTags={selectedTags}
-                            systemsCount={systems && systems.meta && systems.meta.count} />
-                    </li>]
-                }}
-            />
+            <Suspense fallback={<Loading />}>
+                <InventoryTable
+                    ref={inventory}
+                    items={((systemsFetchStatus !== 'pending' && systems && systems.data) || []).map((system) => ({
+                        ...system,
+                        id: system.system_uuid
+                    }))}
+                    isFullView
+                    sortBy={calculateSort()}
+                    onSort={onSort}
+                    hasCheckbox={false}
+                    page={filters.offset / filters.limit + 1}
+                    total={results}
+                    isLoaded={systemsFetchStatus !== 'pending'}
+                    perPage={Number(filters.limit)}
+                    onRefresh={handleRefresh}
+                    filterConfig={{ items: filterConfigItems }}
+                    activeFiltersConfig={activeFiltersConfig}
+                    exportConfig={{
+                        onSelect: (_e, fileType) => downloadReport('systems', fileType, urlBuilder(filters, selectedTags)),
+                        extraItems: [<li key='download-pd' role="menuitem">
+                            <SystemsPdf filters={{ ...filterFetchBuilder(filters) }} selectedTags={selectedTags}
+                                systemsCount={systems && systems.meta && systems.meta.count} />
+                        </li>]
+                    }}
+                />
+            </Suspense>
             : systemsFetchStatus === 'failed' && (<Failed message={intl.formatMessage(messages.systemTableFetchError)} />)
         : <Loading />;
 };

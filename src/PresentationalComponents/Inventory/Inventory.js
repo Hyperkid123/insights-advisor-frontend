@@ -1,11 +1,5 @@
 import './_Inventory.scss';
-
-import * as ReactRedux from 'react-redux';
-import * as pfReactTable from '@patternfly/react-table';
-import * as reactRouterDom from 'react-router-dom';
-
-import React, { useEffect, useRef, useState } from 'react';
-
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import AnsibeTowerIcon from '@patternfly/react-icons/dist/js/icons/ansibeTower-icon';
 import DisableRule from '../../PresentationalComponents/Modals/DisableRule';
 import Loading from '../Loading/Loading';
@@ -16,17 +10,20 @@ import { connect } from 'react-redux';
 import { getRegistry } from '@redhat-cloud-services/frontend-components-utilities/files/Registry';
 import { injectIntl } from 'react-intl';
 import messages from '../../Messages';
-import { reactCore } from '@redhat-cloud-services/frontend-components-utilities/files/inventoryDependencies';
 import routerParams from '@redhat-cloud-services/frontend-components-utilities/files/RouterParams';
 import { systemReducer } from '../../AppReducer';
 import { useStore } from 'react-redux';
+import { sortable } from '@patternfly/react-table';
+import { useHistory } from 'react-router-dom';
+const InventoryTable = React.lazy(() => import('insightsChrome/InventoryTable'));
 
 let page = 1;
 let pageSize = 50;
 let rule_id = '';
 const Inventory = ({ tableProps, onSelectRows, rows, intl, rule, addNotification, items, afterDisableFn, onSortFn, filters }) => {
     const inventory = useRef(null);
-    const [InventoryTable, setInventoryTable] = useState();
+    const history = useHistory();
+    const [isLoading, setIsLoading] = useState(true);
     const [selected, setSelected] = useState([]);
     const [disableRuleModalOpen, setDisableRuleModalOpen] = useState(false);
     const [bulkSelect, setBulkSelect] = useState();
@@ -100,26 +97,18 @@ const Inventory = ({ tableProps, onSelectRows, rows, intl, rule, addNotification
     }, [rows]);
 
     useEffect(() => {
-        (async () => {
-            const { inventoryConnector, mergeWithEntities, INVENTORY_ACTION_TYPES } = await insights.loadInventory({
-                ReactRedux, react: React, reactRouterDom, pfReactTable, pfReact: reactCore
-            });
-
-            getRegistry().register({
-                ...mergeWithEntities(
-                    systemReducer(
-                        [
-                            { title: intl.formatMessage(messages.name), transforms: [pfReactTable.sortable], key: 'display_name' },
-                            { title: intl.formatMessage(messages.lastSeen), transforms: [pfReactTable.sortable], key: 'updated' }
-                        ],
-                        INVENTORY_ACTION_TYPES
-                    )
+        getRegistry().register({
+            ...window.insights.inventory.reducers.mergeWithEntities(
+                systemReducer(
+                    [
+                        { title: intl.formatMessage(messages.name), transforms: [sortable], key: 'display_name' },
+                        { title: intl.formatMessage(messages.lastSeen), transforms: [sortable], key: 'updated' }
+                    ],
+                    window.insights.inventory.INVENTORY_ACTION_TYPES
                 )
-            });
-
-            const { InventoryTable } = inventoryConnector(store);
-            setInventoryTable(() => InventoryTable);
-        })();
+            )
+        });
+        setIsLoading(false);
     }, [intl, store]);
 
     return <React.Fragment>
@@ -130,59 +119,64 @@ const Inventory = ({ tableProps, onSelectRows, rows, intl, rule, addNotification
             afterFn={afterDisableFn}
             hosts={selected} />
         }
-        {InventoryTable ? <InventoryTable
-            ref={inventory}
-            items={items}
-            sortBy={calculateSort()}
-            onSort={onSort}
-            onRefresh={onRefresh}
-            page={page}
-            total={items.length}
-            perPage={pageSize}
-            tableProps={tableProps}
-            dedicatedAction={<RemediationButton
-                key='remediation-button'
-                isDisabled={selected.length === 0 || rule.playbook_count === 0}
-                dataProvider={remediationDataProvider}
-                onRemediationCreated={(result) => onRemediationCreated(result)}>
-                <AnsibeTowerIcon size='sm' className='ins-c-background__default' />
+        {!isLoading ?
+            <Suspense fallback={<Loading />}>
+                <InventoryTable
+                    store={store}
+                    history={history}
+                    ref={inventory}
+                    items={items}
+                    sortBy={calculateSort()}
+                    onSort={onSort}
+                    onRefresh={onRefresh}
+                    page={page}
+                    total={items.length}
+                    perPage={pageSize}
+                    tableProps={tableProps}
+                    dedicatedAction={<RemediationButton
+                        key='remediation-button'
+                        isDisabled={selected.length === 0 || rule.playbook_count === 0}
+                        dataProvider={remediationDataProvider}
+                        onRemediationCreated={(result) => onRemediationCreated(result)}>
+                        <AnsibeTowerIcon size='sm' className='ins-c-background__default' />
                 &nbsp;{intl.formatMessage(messages.remediate)}
-            </RemediationButton>}
-            actionsConfig={{
-                actions: ['', {
-                    label: intl.formatMessage(messages.disableRuleForSystems),
-                    props: { isDisabled: selected.length === 0 },
-                    onClick: () => handleModalToggle(true)
-                }]
-            }}
-            bulkSelect={{
-                count: selected.length,
-                items: [{
-                    title: intl.formatMessage(messages.selectNone),
-                    onClick: () => {
-                        onSelectRows(-1, false);
-                    }
-                },
-                {
-                    ...items && items.length > pageSize ? {
-                        title: intl.formatMessage(messages.selectPage, { items: pageSize }),
-                        onClick: () => {
-                            onSelectRows(0, true);
-                        }
-                    } : {}
-                },
-                {
-                    ...items && items.length > 0 ? {
-                        title: intl.formatMessage(messages.selectAll, { items: items.length || 0 }),
-                        onClick: () => {
-                            bulkSelectfn();
-                        }
-                    } : {}
-                }],
-                checked: selected.length === items.length ? 1 : selected.length === pageSize ? null : 0,
-                onSelect: () => { selected.length > 0 ? onSelectRows(-1, false) : bulkSelectfn(); }
-            }}
-        /> : <Loading />}
+                    </RemediationButton>}
+                    actionsConfig={{
+                        actions: ['', {
+                            label: intl.formatMessage(messages.disableRuleForSystems),
+                            props: { isDisabled: selected.length === 0 },
+                            onClick: () => handleModalToggle(true)
+                        }]
+                    }}
+                    bulkSelect={{
+                        count: selected.length,
+                        items: [{
+                            title: intl.formatMessage(messages.selectNone),
+                            onClick: () => {
+                                onSelectRows(-1, false);
+                            }
+                        },
+                        {
+                            ...items && items.length > pageSize ? {
+                                title: intl.formatMessage(messages.selectPage, { items: pageSize }),
+                                onClick: () => {
+                                    onSelectRows(0, true);
+                                }
+                            } : {}
+                        },
+                        {
+                            ...items && items.length > 0 ? {
+                                title: intl.formatMessage(messages.selectAll, { items: items.length || 0 }),
+                                onClick: () => {
+                                    bulkSelectfn();
+                                }
+                            } : {}
+                        }],
+                        checked: selected.length === items.length ? 1 : selected.length === pageSize ? null : 0,
+                        onSelect: () => { selected.length > 0 ? onSelectRows(-1, false) : bulkSelectfn(); }
+                    }}
+                />
+            </Suspense> : <Loading />}
     </React.Fragment>;
 };
 
