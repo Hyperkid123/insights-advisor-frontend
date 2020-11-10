@@ -35,10 +35,11 @@ module.exports = ({
         remotes: {
             insightsChrome: 'insightsChrome@https://ci.foo.redhat.com:1337/apps/chrome/js/chrome-remote.js'
         },
-        shared: {
-            react: { singleton: true, requiredVersion: deps.react },
+        shared: [{
+            react: { singleton: true, requiredVersion: deps.react }
+        }, {
             'react-dom': { singleton: true, requiredVersion: deps['react-dom'] }
-        }
+        }]
     });
 
     return [
