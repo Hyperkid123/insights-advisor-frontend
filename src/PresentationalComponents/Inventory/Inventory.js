@@ -15,6 +15,7 @@ import { systemReducer } from '../../AppReducer';
 import { useStore } from 'react-redux';
 import { sortable } from '@patternfly/react-table';
 import { useHistory } from 'react-router-dom';
+
 const InventoryTable = React.lazy(() => import('insightsChrome/InventoryTable'));
 
 let page = 1;

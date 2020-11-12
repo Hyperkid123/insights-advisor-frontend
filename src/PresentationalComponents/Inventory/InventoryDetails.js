@@ -22,11 +22,12 @@ const InventoryDetails = ({ entity, match }) => {
     const history = useHistory();
     const [isLoading, setIsLoaing] = useState(true);
 
+    // eslint-disable-next-line max-len
     useEffect(() => {
-        console.log('**************************************');
-        console.log(window.insights.inventory.reducers.mergeWithDetail(entitiesDetailsReducer(window.insights.inventory.INVENTORY_ACTION_TYPES)));
         getRegistry().register({
-            ...window.insights.inventory.reducers.mergeWithDetail(entitiesDetailsReducer(window.insights.inventory.INVENTORY_ACTION_TYPES))
+            ...window.insights.inventory.reducers.mergeWithDetail(entitiesDetailsReducer({
+                ...window.insights.inventory.INVENTORY_ACTION_TYPES.ACTION_TYPES
+            }))
         });
         setIsLoaing(false);
     }, []);

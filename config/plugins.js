@@ -39,7 +39,9 @@ module.exports = ({
             react: { singleton: true, requiredVersion: deps.react }
         }, {
             'react-dom': { singleton: true, requiredVersion: deps['react-dom'] }
-        }]
+        },
+        { '@patternfly/react-core': { singleton: true } }
+        ]
     });
 
     return [

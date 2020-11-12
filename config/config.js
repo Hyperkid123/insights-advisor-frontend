@@ -53,11 +53,6 @@ module.exports = ({
         },
         resolve: {
             extensions: ['.ts', '.tsx', '.mjs', '.js', '.scss'],
-            alias: {
-                customReact: 'react',
-                PFReactCore: '@patternfly/react-core',
-                PFReactTable: '@patternfly/react-table'
-            },
             fallback: {
                 stream: require.resolve('stream-browserify'),
                 zlib: require.resolve('browserify-zlib'),
