@@ -19,12 +19,14 @@ import messages from '../../Messages';
 import routerParams from '@redhat-cloud-services/frontend-components-utilities/files/RouterParams';
 import { systemReducer } from '../../AppReducer';
 import { cellWidth, sortable, wrappable } from '@patternfly/react-table';
+import { useHistory } from 'react-router-dom';
 
 const InventoryTable = React.lazy(() => import('insightsChrome/InventoryTable'));
 
 const SystemsTable = ({ systemsFetchStatus, fetchSystems, systems, intl, filters, setFilters, selectedTags, workloads, SID }) => {
     const inventory = useRef(null);
     const store = useStore();
+    const history = useHistory();
     const results = systems.meta ? systems.meta.count : 0;
     const [searchText, setSearchText] = useState(filters.display_name || '');
     const debouncedSearchText = debounce(searchText, DEBOUNCE_DELAY);
@@ -148,16 +150,14 @@ const SystemsTable = ({ systemsFetchStatus, fetchSystems, systems, intl, filters
             { title: intl.formatMessage(messages.moderate), transforms: [sortable, wrappable], key: 'moderate_hits' },
             { title: intl.formatMessage(messages.low), transforms: [sortable, wrappable], key: 'low_hits' },
             { title: intl.formatMessage(messages.lastSeen), transforms: [sortable, wrappable], key: 'updated' }];
-
-            console.log({ InventoryTable });
-            // getRegistry().register({
-            // ...mergeWithEntities(
-            // systemReducer(
-            // [...rows],
-            // INVENTORY_ACTION_TYPES
-            // )
-            // )
-            // });
+            getRegistry().register({
+                ...window.insights.inventory.reducers.mergeWithEntities(
+                    systemReducer(
+                        [...rows],
+                        window.insights.inventory.INVENTORY_ACTION_TYPES.INVENTORY_ACTION_TYPES
+                    )
+                )
+            });
         })();
     }, [intl, store]);
 
@@ -207,6 +207,8 @@ const SystemsTable = ({ systemsFetchStatus, fetchSystems, systems, intl, filters
         systemsFetchStatus !== 'failed' ?
             <Suspense fallback={<Loading />}>
                 <InventoryTable
+                    store={store}
+                    history={history}
                     ref={inventory}
                     items={((systemsFetchStatus !== 'pending' && systems && systems.data) || []).map((system) => ({
                         ...system,

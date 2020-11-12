@@ -105,7 +105,7 @@ const Inventory = ({ tableProps, onSelectRows, rows, intl, rule, addNotification
                         { title: intl.formatMessage(messages.name), transforms: [sortable], key: 'display_name' },
                         { title: intl.formatMessage(messages.lastSeen), transforms: [sortable], key: 'updated' }
                     ],
-                    window.insights.inventory.INVENTORY_ACTION_TYPES
+                    window.insights.inventory.INVENTORY_ACTION_TYPES.INVENTORY_ACTION_TYPES
                 )
             )
         });
